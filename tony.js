@@ -9,14 +9,51 @@ var timmer;//auto display handle
 var hide=true;//Loader's status. true means it's invisiable.
 var animationSpeed=800;//animation speed
 var shouldShowArea=false;//if program should highlight the current maxi-sum area. with color:yellow
+var height,width;//The height and width
+function FormatData(changeFlag)
+{
+    var rect="";
+    var data=document.getElementById("inputArea");
+    var tmp=data.innerText.split(/ |\n|,|\r|\n\r|[a-z]|[A-Z]/);
+    height=0;
+    width=0;
+    var i;
+    for (i=0;i<tmp.length;++i) if (tmp[i].length!=0) {
+        height=parseInt(tmp[i]);
+        rect="Height: "+tmp[i];
+        break;
+    }
+    for (i=i+1;i<tmp.length;++i) if (tmp[i].length!=0) {
+        width=parseInt(tmp[i]);
+        rect="Weight: "+tmp[i]+rect;
+        break;
+    }
+    var check=0;
+    var pdata=i;
+    for (i=i+1;i<tmp.length;++i) if (tmp[i].length!=0) check++;
+    if (height!=0 && width!=0 && check==height*width) {
+        if (changeFlag) ChangeTable(height,width,tmp,pdata);
+        return rect;
+    }
+    return "";
+}
 function DataLoad()//Set the load button(load, or down)
 {
+    $(".panel").slideToggle("slow");
     if (hide) {
         hide=false;
         document.getElementById("showLoad").innerHTML="Done";
     } else {
         hide=true;
         document.getElementById("showLoad").innerHTML="Load";
+        var tmp=FormatData(true);
+        if (tmp=="") {
+            document.getElementById("inputbar").value="";
+            document.getElementById("inputbar").removeAttribute("readonly");
+        } else {
+            document.getElementById("inputbar").value=tmp;
+            document.getElementById("inputbar").setAttribute("readonly");
+        }
     }
 }
 function ModeChanged(innum)//set the excute mode. via drop down menu
@@ -39,8 +76,9 @@ function ModeChanged(innum)//set the excute mode. via drop down menu
         sm.innerHTML="V &amp; H Connected";
     }
     if (mode==4) mode=3;//Not provided yet
+    return mode;
 }
-function ChangeTable(width,height)//update the row and table (random value
+function ChangeTable(width,height,data,pdata)//update the row and table (random value
 {
     if (width==0) return;
     if (height==0) return;
@@ -81,7 +119,11 @@ function ChangeTable(width,height)//update the row and table (random value
         for (var j=0;j!=width;++j) {
             subsubtmp=document.createElement("td");
             subtmp.appendChild(subsubtmp);
-            subsubtmp.innerHTML=Math.floor(Math.random()*100-50);
+            if (data.length==0) subsubtmp.innerHTML=Math.floor(Math.random()*100-50);
+            else {
+                for (pdata=pdata+1;data[pdata].length==0;++pdata);
+                subsubtmp.innerHTML=data[pdata];
+            }
             subsubtmp.setAttribute("contenteditable","true");
         }
         tmp.appendChild(subtmp);
@@ -94,15 +136,13 @@ function ChangeTable(width,height)//update the row and table (random value
 function RefreshTable()//to update the table, there are some prepareation need to be down. call this function before call ModeChanged
 {
     var tmp=document.getElementById("inputbar");
-    var str=tmp.value;
-    var height=0,width=0,i=0;
-    for (i=0;i!=str.length;++i) {
-        if (str[i]>='0' && str[i]<='9') height=height*10+parseInt(str[i]);
-        else break;
-    }
-    for (i++;i!=str.length;++i) {
-        if (str[i]>='0' && str[i]<='9') width=width*10+parseInt(str[i]);
-        else break;
+    var str=tmp.value.split(/ |,|[a-z]|[A-Z]/);
+    height=0,width=0;
+    for (var i=0;i!=str.length;++i) {
+        if (str[i].length!=0) {
+            if (height==0) height=parseInt(str[i]);
+            else width=parseInt(str[i]);
+        }
     }
     if (height>23) height=0;
     if (width>23) width=0;
@@ -113,7 +153,7 @@ function RefreshTable()//to update the table, there are some prepareation need t
                       });
     setTimeout(function()
                {
-               ChangeTable(width,height);
+               ChangeTable(width,height,"","");
                },animationSpeed)
 }
 function HighlightRow(top,bottom)//highlight table's row from top to bottom
@@ -215,6 +255,7 @@ function InitResult()// Initialization result array
 function Solve()//Calculate the DP problem
 {
     var interResult,now,tot;//now means the connected area in interResult
+    bval=-9999999;//This is not a magic number , this is NINF, initiallization best value
     for (var t=0;t!=arr.length;++t) {
         for (var b=t;b!=arr.length;++b) {
             //Get the sum number of array
@@ -259,8 +300,9 @@ function Solve()//Calculate the DP problem
 function Display()//Display next frame(single-step)
 {
     if (pr==psr) {
-        var tmp=document.getElementById("pause");
-        if (tmp.innerHTML=="<b>Pause</b>") StopCalcu();
+        document.getElementById("pause").innerHTML=="<b>&nbsp;Pause&nbsp;&nbsp;</b>"
+        document.getElementById("pause").setAttribute("class","btn btn btn-warning");
+        clearInterval(timmer)
         return;
     }
     //Update my row data
@@ -276,6 +318,7 @@ function Display()//Display next frame(single-step)
     HighlightColumn(result[2][psr],result[3][psr]);
     if (shouldShowArea)
         HighlightArea(result[4][psr],result[5][psr],result[6][psr],result[7][psr],"warning");
+    document.getElementById("ans").innerHTML="<b>Answer: "+result[8][psr]+"</b>";
     psr++;
 }
 function PrevDis()//DIsplay prev frame(single-step)
@@ -305,14 +348,14 @@ function PrevDis()//DIsplay prev frame(single-step)
 function StopCalcu()//Pause the process
 {
     var tmp=document.getElementById("pause");
-    if (tmp.innerHTML=="<b>Pause</b>") {
+    if (tmp.innerHTML=="<b>&nbsp;Pause&nbsp;&nbsp;</b>") {
         clearInterval(timmer);
         if (psr==pr) return;
         tmp.innerHTML="<b>Resume</b>";
         tmp.setAttribute("class","btn btn btn-success");
     } else {
         timmer=setInterval(Display,1000);
-        tmp.innerHTML="<b>Pause</b>";
+        tmp.innerHTML="<b>&nbsp;Pause&nbsp;&nbsp;</b>";
         tmp.setAttribute("class","btn btn btn-warning");
     }
     
@@ -320,14 +363,17 @@ function StopCalcu()//Pause the process
 function StopAll()//Stop current process. release table and input box. user can change the data again
 {
     var tmp=document.getElementById("inputbar");
-    tmp.removeAttribute("readonly");
+    if (FormatData(false)=="") tmp.removeAttribute("readonly");
     ChangeButtonFunc(true);
-    StopCalcu();
+    clearInterval(timmer);
+    document.getElementById("pause").innerHTML="<b>&nbsp;Pause&nbsp;&nbsp;</b>";
+    document.getElementById("pause").setAttribute("class","btn btn btn-warning");
     pr=0;
     psr=0;
     HighlightRow(0,-1);
     HighlightColumn(0,-1);
     GetMatrix("true");
+    document.getElementById("ans").innerHTML="<b>MaxValue</b>";
 }
 function ShowArea()//Set the maxi-sub rectangle shoule be draw with yellow
 {
@@ -346,13 +392,13 @@ function HideArea()//Clear the maxi-sub rectangle's yellow color
 function ChangeButtonFunc(flag)//Some buttons, when you click it,it's context will be changed. you can find it here.
 {
     if (!flag) {
-        var loadbutton=document.getElementById("run");
-        var runbutton=document.getElementById("showLoad");
+        var loadbutton=document.getElementById("run");//Load at this place means run
+        var runbutton=document.getElementById("showLoad");//run means load
         loadbutton.setAttribute("class","btn btn-danger");
         runbutton.setAttribute("class","btn btn-warning");
         loadbutton.setAttribute("id","stop");
         runbutton.setAttribute("id","showArea");
-        loadbutton.innerHTML="<b>Stop</b>";
+        loadbutton.innerHTML="<b>Stop&nbsp;</b>";
         runbutton.innerHTML="<b>Show</b>";
         loadbutton.setAttribute("onclick","StopAll()");
         runbutton.setAttribute("onclick","");
@@ -367,7 +413,7 @@ function ChangeButtonFunc(flag)//Some buttons, when you click it,it's context wi
         runbutton.setAttribute("id","run");
         loadbutton.innerHTML="<b>Load</b>";
         runbutton.innerHTML="<b>&nbsp;Run&nbsp;</b>";
-        loadbutton.setAttribute("onclick","");
+        loadbutton.setAttribute("onclick","DataLoad()");
         runbutton.setAttribute("onclick","Calculation()");
         runbutton.setAttribute("onmouseover","");
     }
